@@ -71,6 +71,8 @@ void setup(){
 void loop() 
 {
      buttonState = digitalRead(buttonpin);
+
+    
          //check here to see if the string is being sent over bluetooth (Serial1)
     //App Inventor sends a string that contains three bytes (RGB, 0 to 255). 
     if (Serial1.available())
@@ -96,6 +98,8 @@ void loop()
     } 
 //check to see if the pushbutton is pressed.
     if (buttonState ==  HIGH) 
+    
+// it changed, do something
       { 
       Serial.println("button is pressed");
       uint16_t clear, red, green, blue;
@@ -104,7 +108,7 @@ void loop()
     
       delay(60);  // takes 50ms to read 
       
-      tcs.getRawData(&clear, &red, &green, &blue);
+      tcs.getRawData(&red, &green, &blue, &clear);
     
       tcs.setInterrupt(true);  // turn off LED
 
@@ -122,18 +126,18 @@ void loop()
       
       //print the color values to the Serial monitor to make sure that they're coming in correctly
       Serial.print("C:\t"); Serial.print(clear);
-      Serial.print("\tR:\t"); Serial.print(gammatable[(int)r]);
-      Serial.print("\tG:\t"); Serial.print(gammatable[(int)g]);
-      Serial.print("\tB:\t"); Serial.print(gammatable[(int)b]);
-
+      Serial.print("\tR:\t"); Serial.print((int)r);
+      Serial.print("\tG:\t"); Serial.print((int)g);
+      Serial.print("\tB:\t"); Serial.print((int)b);
+      Serial.println();
       Serial.print((int)r, HEX); Serial.print((int)g, HEX); Serial.print((int)b, HEX);
       Serial.println();
       
       //write the values that the color sensor is sensing to the LED
-      analogWrite(redpin, gammatable[(int)r]);
-      analogWrite(greenpin, gammatable[(int)g]);
-      analogWrite(bluepin, gammatable[(int)b]);
-    }
+      analogWrite(redpin, (int)r);
+      analogWrite(greenpin, (int)g);
+      analogWrite(bluepin, (int)b);
+      }
     
 
     
