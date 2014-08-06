@@ -12,8 +12,13 @@
 #define redpin 12
 #define greenpin 9
 #define bluepin 6
+
 //and the pushbutton pin
-#define buttonpin 10
+#define buttonPin 10
+const unsigned long bounceTime = 20000;
+unsigned long waitStart = 0;
+boolean switchOn = false;
+boolean waiting = false;
 
 // variables will change:
 int buttonState = 0;         // variable for reading the pushbutton status
@@ -31,7 +36,7 @@ void setup(){
   pinMode(redpin, OUTPUT);
   pinMode(greenpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
-  pinMode(buttonpin, INPUT);
+  pinMode(buttonPin, INPUT);
 
   //check for proper baud rate
   Serial1.begin(9600);
@@ -70,7 +75,14 @@ void setup(){
 
 void loop() 
 {
-     buttonState = digitalRead(buttonpin);
+      boolean nowOn = digitalRead(buttonPin) == LOW;
+      unsigned long readTime = micros();
+      if (waiting && (nowOn == switchOn)) waiting = false;
+      
+      if ((nowOn != switchOn) && !waiting) {
+        waiting = true;
+        waitStart = readTime;
+      }
          //check here to see if the string is being sent over bluetooth (Serial1)
     //App Inventor sends a string that contains three bytes (RGB, 0 to 255). 
     if (Serial1.available())
@@ -95,7 +107,7 @@ void loop()
       analogWrite(bluepin, bluevalue.toInt());
     } 
 //check to see if the pushbutton is pressed.
-    if (buttonState ==  HIGH) 
+    if ((nowOn != switchOn) && ( (readTime - waitStart) > bounceTime )) 
       { 
       Serial.println("button is pressed");
       uint16_t clear, red, green, blue;
@@ -133,6 +145,7 @@ void loop()
       analogWrite(redpin, gammatable[(int)r]);
       analogWrite(greenpin, gammatable[(int)g]);
       analogWrite(bluepin, gammatable[(int)b]);
+      waiting = false;
     }
     
   } 
