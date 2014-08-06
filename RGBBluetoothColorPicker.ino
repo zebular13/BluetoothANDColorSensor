@@ -135,8 +135,6 @@ void loop()
       analogWrite(bluepin, gammatable[(int)b]);
     }
     
-
-    
   } 
 
 
