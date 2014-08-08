@@ -106,7 +106,7 @@ void loop()
     
       tcs.setInterrupt(false);      // turn on LED
     
-      delay(60);  // takes 50ms to read 
+      delay(3000);  // takes 3 seconds to read 
       
       tcs.getRawData(&red, &green, &blue, &clear);
     
@@ -138,8 +138,6 @@ void loop()
       analogWrite(greenpin, (int)g);
       analogWrite(bluepin, (int)b);
       }
-    
-
     
   } 
 
