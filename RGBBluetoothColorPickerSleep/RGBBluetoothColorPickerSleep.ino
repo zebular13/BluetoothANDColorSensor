@@ -1,28 +1,21 @@
 //include the libraries for the color sensor
 #include <Wire.h>
 #include "Adafruit_TCS34725.h"
-#include <SoftwareSerial.h>
+#include <avr/interrupt.h> 
+#include <avr/power.h>
 #include <avr/sleep.h>
 #include <Button.h>        //https://github.com/JChristensen/Button
-
-// constants won't change. They're used here to set certain pins to be used in certain ways
-
-
-#define rxPin 0
-#define txPin 12
-
-// set up a new serial port
-SoftwareSerial mySerial =  SoftwareSerial(rxPin, txPin);
-byte pinState = 0;
 
 // set to false if using a common cathode LED
 #define commonAnode true
 
 //Define pins to put to sleep
+#define sdapin 2
+#define sclpin 3
 
 
 //PWM pins for the LEDs
-#define redpin 1
+#define redpin 12
 #define greenpin 9
 #define bluepin 6
 
@@ -36,26 +29,25 @@ byte pinState = 0;
 //means the button is NOT pressed. (Assuming a normally open switch.)
 #define DEBOUNCE_MS 20     //A debounce time of 20 milliseconds usually works well for tactile button switches.
 #define LONG_PRESS 1000    //We define a "long press" to be 1000 milliseconds.
-#define BLINK_INTERVAL 100 //In the BLINK state, switch the LED every 100 milliseconds.
+#define SLEEP_INTERVAL 100 //In the SLEEP state, switch the LED every 100 milliseconds.
 Button myBtn(buttonpin, PULLUP, INVERT, DEBOUNCE_MS);    //Declare the button
 
 //The list of possible states for the state machine. This state machine has a fixed
-//sequence of states, i.e. ONOFF --> TO_BLINK --> BLINK --> TO_ONOFF --> ONOFF
+//sequence of states, i.e. ONOFF --> TO_SLEEP --> SLEEP --> TO_ONOFF --> ONOFF
 //Note that while the user perceives two "modes", i.e. ON/OFF mode and rapid blink mode,
 //two extra states are needed in the state machine to transition between these modes.
-enum {ONOFF, TO_BLINK, BLINK, TO_ONOFF};   
+enum {ONOFF, TO_SLEEP, SLEEP, TO_ONOFF};   
 
   uint8_t STATE;                   //The current state machine state
-  boolean ledState;                //The current LED status
-  boolean sleepState;              //The current sleep status
+  boolean sleepState;                //The current LED status
   unsigned long ms;                //The current time from millis()
   unsigned long msLast;            //The last time the LED was switched
 
-
+int sleeping = 0;
 // our RGB -> eye-recognized gamma color
 byte gammatable[256];
 
-//declare the color sensor
+//declare the color sensorw
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
 
@@ -65,17 +57,13 @@ void setup(){
   pinMode(greenpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
   pinMode(buttonpin, INPUT);
-  pinMode(rxPin, INPUT);
-  pinMode(txPin, OUTPUT);
-    while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-      
-  }
-  attachInterrupt(3, wakeUp, HIGH);
-  
+
   //check for proper baud rate
   Serial1.begin(9600);
   
+  while (!Serial1) {
+    ; // wait for serial port to connect. Needed for Leonardo only  
+  }
   //code to check if sensor is available
   if (tcs.begin()) 
   {
@@ -104,17 +92,32 @@ void setup(){
       gammatable[i] = x;      
     }
   }
+  attachInterrupt(2, wakeUp, RISING);
 } 
 void sleepNow()         // here we put the arduino to sleep
 {
+  Serial1.end (); 
+  sleeping == 1;
   sleep_enable();
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);   // sleep mode is set here
-  //
+  set_sleep_mode(SLEEP_MODE_IDLE);   // sleep mode is set here
+  power_adc_disable();
+  power_spi_disable();
+  power_timer0_disable();
+  power_timer1_disable();
+  power_timer2_disable();
+  power_twi_disable();
+  sleep_mode();
 }
 void wakeUp()
 {
   sleep_disable();
-  detachInterrupt(3);
+  power_all_enable();
+  Serial1.begin(9600);
+  while (!Serial1) { }  // wait for Serial to initialize
+  detachInterrupt(2);
+
+  Serial.println("I'm awake");
+  Serial.flush();
 }
 void loop() 
 {
@@ -124,30 +127,33 @@ void loop()
   switch (STATE) {
 
     //This state watches for short and long presses, switches the LED for
-    //short presses, and moves to the TO_BLINK state for long presses.
+    //short presses, and moves to the TO_SLEEP state for long presses.
   case ONOFF:                
     if (myBtn.wasReleased())
       senseColor();
     else if (myBtn.pressedFor(LONG_PRESS))
-      STATE = TO_BLINK;
+      STATE = TO_SLEEP;
     break;
 
     //This is a transition state where we start the fast blink as feedback to the user,
     //but we also need to wait for the user to release the button, i.e. end the
-    //long press, before moving to the BLINK state.
-  case TO_BLINK:
+    //long press, before moving to the SLEEP state.
+  case TO_SLEEP:
     if (myBtn.wasReleased())
+    {
       senseColor();
+      switchSleep();
+    }
     else
       goToSleep();
     break;
 
     //The fast-blink state. Watch for another long press which will cause us to
     //turn the LED off (as feedback to the user) and move to the TO_ONOFF state.
-  case BLINK:
+  case SLEEP:
     if (myBtn.pressedFor(LONG_PRESS)) {
       STATE = TO_ONOFF;
-      ledState = false;
+      sleepState = false;
     }
     else
       goToSleep();
@@ -249,17 +255,22 @@ void senseColor()
 void switchSleep()
 {
   msLast = ms;                 //record the last switch time
-  ledState = !ledState;
+  sleepState = !sleepState;
 }
 
-//Switch the LED on and off every BLINK_INETERVAL milliseconds.
+//Switch the LED on and off every SLEEP_INETERVAL milliseconds.
 void goToSleep()
 {
-  if (ms - msLast >= BLINK_INTERVAL)
-  delay(100);     // this delay is needed, the sleep
-  //function will provoke a Serial error otherwise!!
-  sleepNow();
-  Serial.println("Entering Sleep mode");
+  if (ms - msLast >= SLEEP_INTERVAL && sleeping == 0)
+    digitalWrite(redpin, LOW);
+    digitalWrite(greenpin, LOW);
+    digitalWrite(bluepin, LOW);
+    digitalWrite(sclpin, LOW);  
+    digitalWrite(sdapin, LOW);    
+    Serial.println("Entering Sleep mode");
+    delay(100);     // this delay is needed, the sleep
+    //function will provoke a Serial error otherwise!!
+    sleepNow();
 
 }
 

@@ -1,28 +1,23 @@
 //include the libraries for the color sensor
 #include <Wire.h>
 #include "Adafruit_TCS34725.h"
-#include <SoftwareSerial.h>
+#include <avr/power.h>
 #include <avr/sleep.h>
 #include <Button.h>        //https://github.com/JChristensen/Button
 
-// constants won't change. They're used here to set certain pins to be used in certain ways
-
-
-#define rxPin 0
-#define txPin 12
-
 // set up a new serial port
-SoftwareSerial mySerial =  SoftwareSerial(rxPin, txPin);
 byte pinState = 0;
 
 // set to false if using a common cathode LED
 #define commonAnode true
 
 //Define pins to put to sleep
+#define sdapin 2
+#define sclpin 3
 
 
 //PWM pins for the LEDs
-#define redpin 1
+#define redpin 12
 #define greenpin 9
 #define bluepin 6
 
@@ -51,7 +46,7 @@ enum {ONOFF, TO_BLINK, BLINK, TO_ONOFF};
   unsigned long ms;                //The current time from millis()
   unsigned long msLast;            //The last time the LED was switched
 
-
+int sleeping = 0;
 // our RGB -> eye-recognized gamma color
 byte gammatable[256];
 
@@ -65,13 +60,11 @@ void setup(){
   pinMode(greenpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
   pinMode(buttonpin, INPUT);
-  pinMode(rxPin, INPUT);
-  pinMode(txPin, OUTPUT);
     while (!Serial) {
     ; // wait for serial port to connect. Needed for Leonardo only
       
   }
-  attachInterrupt(3, wakeUp, HIGH);
+  attachInterrupt(2, wakeUp, LOW);
   
   //check for proper baud rate
   Serial1.begin(9600);
@@ -107,14 +100,27 @@ void setup(){
 } 
 void sleepNow()         // here we put the arduino to sleep
 {
+  sleeping == 1;
   sleep_enable();
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN);   // sleep mode is set here
+  set_sleep_mode(SLEEP_MODE_IDLE);   // sleep mode is set here
+      power_adc_disable();
+    power_spi_disable();
+    power_timer0_disable();
+    power_timer1_disable();
+    power_timer2_disable();
+    power_twi_disable();
+    sleep_mode();
   //
 }
 void wakeUp()
 {
+
   sleep_disable();
-  detachInterrupt(3);
+  detachInterrupt(2);
+  power_all_enable();
+  //Serial.flush();
+  sleeping == 0;
+  Serial.println("I'm awake");
 }
 void loop() 
 {
@@ -256,9 +262,13 @@ void switchSleep()
 void goToSleep()
 {
   if (ms - msLast >= BLINK_INTERVAL)
+  digitalWrite(redpin, LOW);
+  digitalWrite(greenpin, LOW);
+  digitalWrite(bluepin, LOW);
+  digitalWrite(sclpin, LOW);  
+  digitalWrite(sdapin, LOW);
   delay(100);     // this delay is needed, the sleep
   //function will provoke a Serial error otherwise!!
-  sleepNow();
   Serial.println("Entering Sleep mode");
 
 }
