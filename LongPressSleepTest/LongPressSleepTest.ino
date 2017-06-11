@@ -1,21 +1,5 @@
-/*----------------------------------------------------------------------*
- * Example sketch for Arduino Button Library by Jack Christensen        *
- *                                                                      *
- * An example that uses both short and long button presses.             *
- *                                                                      *
- * A simple state machine where a short press of the button turns the   *
- * Arduino pin 13 LED on or off, and a long press causes the LED to     *
- * blink rapidly. Once in rapid blink mode, another long press goes     *
- * back to on/off mode.                                                 *
- *                                                                      *
- * This work is licensed under the Creative Commons Attribution-        *
- * ShareAlike 3.0 Unported License. To view a copy of this license,     *
- * visit http://creativecommons.org/licenses/by-sa/3.0/ or send a       *
- * letter to Creative Commons, 171 Second Street, Suite 300,            *
- * San Francisco, California, 94105, USA.                               *
- *----------------------------------------------------------------------*/
 #include <avr/sleep.h>
-#include <Button.h>        //https://github.com/JChristensen/Button
+#include <Button.h>        
 
 #define BUTTON_PIN 10       //Connect a tactile button switch (or something similar)
 //from Arduino pin 2 to ground.
@@ -142,5 +126,4 @@ void goToSleep()
   //function will provoke a Serial error otherwise!!
   sleepNow(); 
 }
-
 
